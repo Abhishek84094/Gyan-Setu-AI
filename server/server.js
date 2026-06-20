@@ -123,35 +123,65 @@ app.post('/api/grade', async (req, res) => {
   const maxMarks = modelSolution.reduce((sum, s) => sum + s.marks, 0);
 
   const prompt = `
-You are a strict and helpful CBSE and ICSE Board Class 10 Math Examiner.
-You must grade the student's handwritten or typed response to the following question.
+You are a STRICT and PRECISE CBSE / ICSE Board Class 10 Mathematics Examiner with 20+ years of experience.
+Your ONLY job is to evaluate the student's response EXACTLY as written — number by number, symbol by symbol.
 
-Question: "${questionText}"
-Max Marks: ${maxMarks}
+QUESTION: "${questionText}"
+MAXIMUM MARKS: ${maxMarks}
 
-Model Marking Scheme (Step-by-Step):
+STEP-WISE MARKING SCHEME:
 ${modelSolution.map((s, i) => `Step ${i + 1} [Max ${s.marks} marks]: ${s.description}`).join("\n")}
 
-Student's Answer:
+STUDENT'S ANSWER:
 "${studentAnswer}"
 
-${inputType === 'photo' ? 'NOTE: The student submitted images of their handwriting. Check all attached pages to read their calculation steps.' : ''}
+${inputType === 'photo' ? `NOTE: The student submitted handwritten worksheet images. You MUST carefully OCR and read every number, symbol, and calculation the student actually wrote on each page. Do NOT assume they wrote the correct answer — read precisely what is visible in the handwriting, line by line.` : ''}
 
-Evaluate the student's answer step-by-step against the marking scheme. Provide partial marks for steps where the formula or method is correct, even if they have an arithmetic error in the final calculation. 
-You must respond with a JSON object ONLY, matching this format exactly, with no additional explanation text:
+══════════════════════════════════════════════════════
+⚠️  CRITICAL ANTI-HALLUCINATION RULES — MANDATORY:
+══════════════════════════════════════════════════════
+1. READ the student's answer EXACTLY as written. Do NOT substitute the correct answer for what they actually wrote.
+2. QUOTE what the student literally wrote for each step (e.g., "Student wrote: D = 8 + 12 = 20").
+3. COMPARE the student's actual numbers/values to the mathematically correct values step by step.
+4. If the student's computed result is WRONG (e.g., they wrote 20 but correct is 32), you MUST flag it as an error and DEDUCT marks accordingly. Do NOT say this step is "Correct".
+5. NEVER declare a step correct or award full marks if the student's actual computed value is mathematically wrong.
+6. For PHOTO submissions: Read the handwriting meticulously. If the student wrote 20, grade it as 20. If they wrote 32, grade it as 32. Do NOT substitute the correct answer.
+7. A student who writes the right formula but computes the wrong number has made an ARITHMETIC ERROR — award only partial marks for that step.
+
+══════════════════════════════════════════════════════
+📋  MARKING CRITERIA (Apply strictly):
+══════════════════════════════════════════════════════
+- FULL MARKS: Student's method is correct AND their computed value/result for this step is mathematically correct.
+- PARTIAL MARKS (50% of step marks, rounded to nearest 0.5): Student correctly sets up the formula or method, but makes an arithmetic or algebraic error leading to a wrong intermediate number or final result.
+- ZERO MARKS: Wrong formula used, step is completely missing, or answer is irrelevant/blank.
+
+══════════════════════════════════════════════════════
+📝  REQUIRED CONTENT IN EACH STEP'S FEEDBACK:
+══════════════════════════════════════════════════════
+For every step you must clearly state:
+a) studentWrote — The exact quote of what the student wrote for this step
+b) correctAnswer — The mathematically correct working and result for this step, showing the calculation clearly
+c) errorFound — null if fully correct, OR a specific and detailed description of the EXACT mistake. 
+   Example of a good errorFound: "Student computed -4ac as 12 instead of 24. Correct calculation: 4 × √3 × 2√3 = 4 × 2 × (√3)² = 4 × 2 × 3 = 24. Student likely omitted the coefficient 2 inside 2√3, computing 4 × √3 × √3 = 4×3 = 12 only."
+d) feedback — A clear, teacher-like explanation that states: what the student did right, what was wrong, the exact error, and why marks were awarded or deducted.
+
+You must respond with ONLY a valid JSON object matching this exact format. No markdown, no code fences, no extra text:
 {
-  "totalMarks": number (Max marks of question),
-  "scoredMarks": number (Total marks scored by the student, sum of scoredMarks of all steps),
+  "totalMarks": ${maxMarks},
+  "scoredMarks": <number: exact sum of scoredMarks from all steps>,
   "steps": [
     {
-      "stepNumber": number (1, 2, ...),
-      "description": "Short description of what the step is evaluating (matching the model scheme)",
-      "maxMarks": number (maximum marks for this step),
-      "scoredMarks": number (marks scored by the student, can be decimal like 0.5),
-      "feedback": "Specific comment on what they did right or wrong in this step"
+      "stepNumber": <number: 1, 2, ...>,
+      "description": "<short description matching the marking scheme step>",
+      "maxMarks": <number: maximum marks for this step>,
+      "scoredMarks": <number: 0, partial value, or full marks — strictly based on evaluation>,
+      "studentWrote": "<exact quote of what the student actually wrote/calculated for this step>",
+      "correctAnswer": "<the mathematically correct working and answer for this step with calculation shown>",
+      "errorFound": <null if step is fully correct, or a detailed string describing the specific mistake made>,
+      "feedback": "<detailed teacher-like explanation: what was correct, what was wrong, why marks were given or deducted>"
     }
   ],
-  "generalFeedback": "Provide an encouraging and critical summary feedback of the entire response (mention arithmetic errors, formula correctness, etc.)",
+  "generalFeedback": "<Balanced 2-4 sentence summary: acknowledge what was done correctly, clearly state all errors found by name, give specific actionable advice on what to study or practice to avoid this mistake in the board exam>",
   "modelUsed": "Model-Name-Here"
 }
 `;
@@ -159,7 +189,7 @@ You must respond with a JSON object ONLY, matching this format exactly, with no 
   // 1. TRY GEMINI (Primary - Supports Multimodal Worksheets)
   if (geminiKey) {
     try {
-      console.log("[SERVER] Evaluating with Gemini...");
+      console.log("[SERVER] Evaluating with Gemini 1.5 Flash...");
       const parts = [{ text: prompt }];
 
       if (inputType === "photo" && imagesArray && imagesArray.length > 0) {
@@ -206,10 +236,10 @@ You must respond with a JSON object ONLY, matching this format exactly, with no 
   // 2. TRY GROQ (Fallback 1)
   if (groqKey) {
     try {
-      console.log("[SERVER] Evaluating with Groq...");
+      console.log("[SERVER] Evaluating with Groq Llama 3...");
       let textToSend = prompt;
       if (inputType === "photo") {
-        textToSend += "\n[Warning: Image upload fallback. Student provided an image, but Groq evaluation is limited to text. Evaluating the text transcription/inputs instead.]";
+        textToSend += "\n[Note: Student submitted handwritten images. Groq is text-only, so evaluate based on whatever text description is in the studentAnswer field. Be extra strict about any numbers or values mentioned.]";
       }
 
       const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
@@ -221,7 +251,10 @@ You must respond with a JSON object ONLY, matching this format exactly, with no 
         body: JSON.stringify({
           model: "llama-3.3-70b-versatile",
           messages: [
-            { role: "system", content: "You are a grading system returning JSON." },
+            {
+              role: "system",
+              content: "You are a strict CBSE mathematics examiner. You MUST carefully read what the student actually wrote and compare it to the correct mathematical answer. NEVER hallucinate correct answers or award marks for wrong values. If student wrote 20 and correct is 32, it is WRONG. Return only valid JSON matching the requested schema exactly."
+            },
             { role: "user", content: textToSend }
           ],
           response_format: { type: "json_object" }

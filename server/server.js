@@ -122,7 +122,75 @@ app.post('/api/grade', async (req, res) => {
 
   const maxMarks = modelSolution.reduce((sum, s) => sum + s.marks, 0);
 
-  const prompt = `
+  const isPhotoMode = inputType === 'photo';
+
+  // ─── Shared JSON output schema instruction ────────────────────────────────
+  const jsonSchema = `
+You must respond with ONLY a valid JSON object matching this exact format. No markdown, no code fences, no extra text:
+{
+  "totalMarks": ${maxMarks},
+  "scoredMarks": <sum of all step scoredMarks>,
+  "steps": [
+    {
+      "stepNumber": <1, 2, ...>,
+      "description": "<short description matching the marking scheme step>",
+      "maxMarks": <maximum marks for this step>,
+      "scoredMarks": <marks actually scored: 0, partial, or full>,
+      "studentWrote": "<exact quote or OCR of what the student wrote/calculated for this step>",
+      "correctAnswer": "<mathematically correct working and result for this step with calculation shown>",
+      "errorFound": <null if step is fully correct, or detailed string describing the specific mistake>,
+      "feedback": "<clear teacher-like explanation: what was correct, what was wrong, why marks were given or deducted>"
+    }
+  ],
+  "generalFeedback": "<2-4 sentence summary: acknowledge correct parts, state all errors clearly, give specific advice on what to practice>",
+  "modelUsed": "Model-Name-Here"
+}`;
+
+  // ─── Shared marking criteria ───────────────────────────────────────────────
+  const markingCriteria = `
+MARKING CRITERIA (Apply strictly):
+- FULL MARKS: Student's method is correct AND their computed value/result is mathematically correct.
+- PARTIAL MARKS (50% of step marks, rounded to nearest 0.5): Student sets up the correct formula/method but makes an arithmetic or algebraic error leading to a wrong number or result.
+- ZERO MARKS: Wrong formula, missing step, or completely irrelevant/blank answer.`;
+
+  // ─── PHOTO MODE PROMPT — tells model to read attached images, not text ─────
+  const photoPrompt = `
+You are a STRICT and PRECISE CBSE / ICSE Board Class 10 Mathematics Examiner with 20+ years of experience.
+
+QUESTION: "${questionText}"
+MAXIMUM MARKS: ${maxMarks}
+
+STEP-WISE MARKING SCHEME:
+${modelSolution.map((s, i) => `Step ${i + 1} [Max ${s.marks} marks]: ${s.description}`).join("\n")}
+
+PHOTO SUBMISSION — READ IMAGES, NOT TEXT:
+The student submitted HANDWRITTEN WORKSHEET IMAGES. These images are attached to this message.
+The "studentAnswer" text field only contains a file count placeholder — DO NOT use it to grade.
+YOUR ACTUAL TASK: Carefully examine each attached image page by page. Use OCR to read every equation,
+number, symbol, step, and calculation that the student has handwritten. Grade based ONLY on what
+you can actually read in the images.
+
+RULES FOR PHOTO GRADING:
+1. READ the handwriting in all attached images carefully — look at every line of working shown.
+2. DO NOT say "no answer provided" — the student's work is in the attached images.
+3. QUOTE what you can read from the handwriting for each step (e.g., "Student wrote: Let x = usual speed, x+250 = new speed").
+4. COMPARE the student's actual written numbers/values to the correct mathematical values.
+5. If the student's written result is WRONG (e.g., wrong equation, wrong factorisation), flag it and deduct marks.
+6. If the student wrote the right method but made an arithmetic error in the written calculation, award PARTIAL marks.
+7. If a step is not visible or not attempted in any image, award ZERO marks for that step.
+8. NEVER award marks based on what the correct answer should be — only on what is actually written in the images.
+${markingCriteria}
+
+REQUIRED CONTENT PER STEP:
+For each step you must identify from the images:
+a) studentWrote — OCR quote of what the student actually wrote for this step in their handwriting
+b) correctAnswer — The mathematically correct working and result for this step
+c) errorFound — null if correct, or specific description of the exact mistake visible in the handwriting
+d) feedback — Clear teacher-like explanation of what was right/wrong and why marks were given/deducted
+${jsonSchema}`;
+
+  // ─── TEXT/VOICE MODE PROMPT — strict reading of studentAnswer text ─────────
+  const textPrompt = `
 You are a STRICT and PRECISE CBSE / ICSE Board Class 10 Mathematics Examiner with 20+ years of experience.
 Your ONLY job is to evaluate the student's response EXACTLY as written — number by number, symbol by symbol.
 
@@ -135,56 +203,24 @@ ${modelSolution.map((s, i) => `Step ${i + 1} [Max ${s.marks} marks]: ${s.descrip
 STUDENT'S ANSWER:
 "${studentAnswer}"
 
-${inputType === 'photo' ? `NOTE: The student submitted handwritten worksheet images. You MUST carefully OCR and read every number, symbol, and calculation the student actually wrote on each page. Do NOT assume they wrote the correct answer — read precisely what is visible in the handwriting, line by line.` : ''}
-
-══════════════════════════════════════════════════════
-⚠️  CRITICAL ANTI-HALLUCINATION RULES — MANDATORY:
-══════════════════════════════════════════════════════
-1. READ the student's answer EXACTLY as written. Do NOT substitute the correct answer for what they actually wrote.
+CRITICAL ANTI-HALLUCINATION RULES — MANDATORY:
+1. READ the student's answer EXACTLY as written. Do NOT substitute the correct answer for what they wrote.
 2. QUOTE what the student literally wrote for each step (e.g., "Student wrote: D = 8 + 12 = 20").
 3. COMPARE the student's actual numbers/values to the mathematically correct values step by step.
-4. If the student's computed result is WRONG (e.g., they wrote 20 but correct is 32), you MUST flag it as an error and DEDUCT marks accordingly. Do NOT say this step is "Correct".
+4. If the student's computed result is WRONG (e.g., they wrote 20 but correct is 32), you MUST flag it as an error and DEDUCT marks. Do NOT say this step is "Correct".
 5. NEVER declare a step correct or award full marks if the student's actual computed value is mathematically wrong.
-6. For PHOTO submissions: Read the handwriting meticulously. If the student wrote 20, grade it as 20. If they wrote 32, grade it as 32. Do NOT substitute the correct answer.
-7. A student who writes the right formula but computes the wrong number has made an ARITHMETIC ERROR — award only partial marks for that step.
+6. A student who writes the right formula but computes the wrong number has made an ARITHMETIC ERROR — award only partial marks for that step.
+${markingCriteria}
 
-══════════════════════════════════════════════════════
-📋  MARKING CRITERIA (Apply strictly):
-══════════════════════════════════════════════════════
-- FULL MARKS: Student's method is correct AND their computed value/result for this step is mathematically correct.
-- PARTIAL MARKS (50% of step marks, rounded to nearest 0.5): Student correctly sets up the formula or method, but makes an arithmetic or algebraic error leading to a wrong intermediate number or final result.
-- ZERO MARKS: Wrong formula used, step is completely missing, or answer is irrelevant/blank.
+REQUIRED CONTENT PER STEP:
+a) studentWrote — Exact quote of what the student wrote for this step
+b) correctAnswer — Mathematically correct working and result with calculation shown
+c) errorFound — null if correct, or specific description of the exact mistake made
+d) feedback — Clear teacher-like explanation: what was right, what was wrong, why marks were given or deducted
+${jsonSchema}`;
 
-══════════════════════════════════════════════════════
-📝  REQUIRED CONTENT IN EACH STEP'S FEEDBACK:
-══════════════════════════════════════════════════════
-For every step you must clearly state:
-a) studentWrote — The exact quote of what the student wrote for this step
-b) correctAnswer — The mathematically correct working and result for this step, showing the calculation clearly
-c) errorFound — null if fully correct, OR a specific and detailed description of the EXACT mistake. 
-   Example of a good errorFound: "Student computed -4ac as 12 instead of 24. Correct calculation: 4 × √3 × 2√3 = 4 × 2 × (√3)² = 4 × 2 × 3 = 24. Student likely omitted the coefficient 2 inside 2√3, computing 4 × √3 × √3 = 4×3 = 12 only."
-d) feedback — A clear, teacher-like explanation that states: what the student did right, what was wrong, the exact error, and why marks were awarded or deducted.
+  const prompt = isPhotoMode ? photoPrompt : textPrompt;
 
-You must respond with ONLY a valid JSON object matching this exact format. No markdown, no code fences, no extra text:
-{
-  "totalMarks": ${maxMarks},
-  "scoredMarks": <number: exact sum of scoredMarks from all steps>,
-  "steps": [
-    {
-      "stepNumber": <number: 1, 2, ...>,
-      "description": "<short description matching the marking scheme step>",
-      "maxMarks": <number: maximum marks for this step>,
-      "scoredMarks": <number: 0, partial value, or full marks — strictly based on evaluation>,
-      "studentWrote": "<exact quote of what the student actually wrote/calculated for this step>",
-      "correctAnswer": "<the mathematically correct working and answer for this step with calculation shown>",
-      "errorFound": <null if step is fully correct, or a detailed string describing the specific mistake made>,
-      "feedback": "<detailed teacher-like explanation: what was correct, what was wrong, why marks were given or deducted>"
-    }
-  ],
-  "generalFeedback": "<Balanced 2-4 sentence summary: acknowledge what was done correctly, clearly state all errors found by name, give specific actionable advice on what to study or practice to avoid this mistake in the board exam>",
-  "modelUsed": "Model-Name-Here"
-}
-`;
 
   // 1. TRY GEMINI (Primary - Supports Multimodal Worksheets)
   if (geminiKey) {
@@ -233,14 +269,31 @@ You must respond with ONLY a valid JSON object matching this exact format. No ma
     }
   }
 
-  // 2. TRY GROQ (Fallback 1)
+  // 2. TRY GROQ (Fallback 1 — Text/Voice only; cannot process images)
+  if (isPhotoMode && !geminiKey) {
+    // Photo grading requires a vision model. If Gemini is not configured, return a clear error.
+    console.warn("[SERVER] Photo grading requires Gemini (vision model). Groq cannot process images.");
+    return res.status(503).json({
+      error: true,
+      message: "Photo worksheet grading requires the Gemini API (a vision model). Groq and the local mock grader cannot read handwritten images. Please ensure GEMINI_API_KEY is configured on the server.",
+      modelUsed: "None — Vision Model Required"
+    });
+  }
+
+  if (isPhotoMode && groqKey) {
+    // Gemini failed on photo — don't silently fall to Groq (which can't see images)
+    // Return a meaningful error so the student knows to retry
+    console.warn("[SERVER] Gemini failed for photo submission. Groq cannot process images. Returning error.");
+    return res.status(503).json({
+      error: true,
+      message: "The photo worksheet could not be graded because the AI vision service is temporarily unavailable. Please try again in a moment, or switch to text/voice input.",
+      modelUsed: "Gemini 1.5 Flash (Unavailable)"
+    });
+  }
+
   if (groqKey) {
     try {
       console.log("[SERVER] Evaluating with Groq Llama 3...");
-      let textToSend = prompt;
-      if (inputType === "photo") {
-        textToSend += "\n[Note: Student submitted handwritten images. Groq is text-only, so evaluate based on whatever text description is in the studentAnswer field. Be extra strict about any numbers or values mentioned.]";
-      }
 
       const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
         method: "POST",
@@ -255,7 +308,7 @@ You must respond with ONLY a valid JSON object matching this exact format. No ma
               role: "system",
               content: "You are a strict CBSE mathematics examiner. You MUST carefully read what the student actually wrote and compare it to the correct mathematical answer. NEVER hallucinate correct answers or award marks for wrong values. If student wrote 20 and correct is 32, it is WRONG. Return only valid JSON matching the requested schema exactly."
             },
-            { role: "user", content: textToSend }
+            { role: "user", content: prompt }
           ],
           response_format: { type: "json_object" }
         })
@@ -282,6 +335,7 @@ You must respond with ONLY a valid JSON object matching this exact format. No ma
   const mockResult = evaluateAnswerLocallyMock(questionText, modelSolution, studentAnswer, inputType);
   return res.json(mockResult);
 });
+
 
 /**
  * Endpoint: POST /api/transcribe

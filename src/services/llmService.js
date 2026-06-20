@@ -30,21 +30,37 @@ export async function gradeAnswerWithFallback({
       })
     });
 
+    const result = await response.json();
+
+    // Handle explicit server-side error for photo grading (e.g., vision model unavailable)
+    if (result.error) {
+      if (onLog) onLog(`Grading failed: ${result.message}`);
+      throw new Error(result.message);
+    }
+
     if (!response.ok) {
       throw new Error(`Server returned status ${response.status}`);
     }
 
-    const result = await response.json();
     if (onLog) onLog(`Grading resolved via ${result.modelUsed}.`);
     return result;
   } catch (error) {
+    // For photo mode, don't silently fall to the frontend mock grader — it cannot read images either
+    if (inputType === 'photo') {
+      console.warn("Photo grading failed on server:", error.message);
+      if (onLog) onLog(`Photo grading failed: ${error.message}`);
+      // Re-throw so the caller (PracticeArea) can show a proper error message
+      throw error;
+    }
+
     console.warn("Backend grading failed. Falling back to frontend Local Mock Examiner.", error);
     if (onLog) onLog(`Backend unavailable (${error.message}). Falling back to frontend Mock Examiner...`);
     
-    // Final frontend deterministic fallback
+    // Final frontend deterministic fallback (text/voice only)
     return evaluateAnswerLocally(questionId, studentAnswer, inputType);
   }
 }
+
 
 /**
  * Multi-LLM Transcription Service - Proxy through secure Backend Server

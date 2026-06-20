@@ -28,6 +28,7 @@ export default function PracticeArea({ activeQuestion, onGraded, onStartAdaptive
 
   const fileInputRef = useRef(null);
   const recognitionRef = useRef(null);
+  const isRecordingRef = useRef(false);
 
   // Reset inputs when question changes
   useEffect(() => {
@@ -39,6 +40,7 @@ export default function PracticeArea({ activeQuestion, onGraded, onStartAdaptive
     setGradeResult(null);
     setApiLogs([]);
     setIsDictating(false);
+    isRecordingRef.current = false;
     
     // Stop recording if active
     if (mediaRecorder && mediaRecorder.state === "recording") {
@@ -78,11 +80,25 @@ export default function PracticeArea({ activeQuestion, onGraded, onStartAdaptive
 
       rec.onerror = (e) => {
         console.error("Speech Recognition Error:", e);
+        // Do not reset isDictating for ignorable errors (e.g. silence timeout or aborted transitions)
+        if (e.error === 'no-speech' || e.error === 'aborted' || e.error === 'network') {
+          return;
+        }
         setIsDictating(false);
+        isRecordingRef.current = false;
       };
 
       rec.onend = () => {
-        setIsDictating(false);
+        // Auto-restart if user still intended to be recording
+        if (isRecordingRef.current) {
+          try {
+            rec.start();
+          } catch (err) {
+            console.warn("Failed to auto-restart Speech Recognition:", err);
+          }
+        } else {
+          setIsDictating(false);
+        }
       };
 
       recognitionRef.current = rec;
@@ -92,8 +108,9 @@ export default function PracticeArea({ activeQuestion, onGraded, onStartAdaptive
 
   // Voice recording toggle using standard MediaRecorder API
   const handleToggleVoice = async () => {
-    if (isDictating) {
+    if (isRecordingRef.current) {
       // Stop recording and speech recognition
+      isRecordingRef.current = false;
       if (recognitionRef.current) {
         recognitionRef.current.stop();
       }
@@ -127,6 +144,7 @@ export default function PracticeArea({ activeQuestion, onGraded, onStartAdaptive
         recorder.start();
         setMediaRecorder(recorder);
         
+        isRecordingRef.current = true;
         if (recognitionRef.current) {
           recognitionRef.current.start();
         }
@@ -136,36 +154,102 @@ export default function PracticeArea({ activeQuestion, onGraded, onStartAdaptive
         console.error("Failed to access microphone", err);
         setApiLogs(prev => [...prev, "Microphone access blocked. Simulating speech transcription instead."]);
         // Trigger simulated audio text
+        isRecordingRef.current = true;
         setIsDictating(true);
         setTimeout(() => {
-          setTranscribedText("Let the quadratic equation be 2x squared minus 4x plus 3 equals 0. Evaluating discriminant D equals b squared minus 4ac gives minus 4 squared minus 4 into 2 into 3. D equals 16 minus 24 equals minus 8. Since discriminant is less than zero, the equation has no real roots.");
-          setIsDictating(false);
+          if (isRecordingRef.current) {
+            setTranscribedText("Let the quadratic equation be 2x squared minus 4x plus 3 equals 0. Evaluating discriminant D equals b squared minus 4ac gives minus 4 squared minus 4 into 2 into 3. D equals 16 minus 24 equals minus 8. Since discriminant is less than zero, the equation has no real roots.");
+            setIsDictating(false);
+            isRecordingRef.current = false;
+          }
         }, 3000);
       }
     }
   };
 
-  // Image Upload handler for multiple pages
-  const handleImageFiles = (files) => {
-    if (!files || files.length === 0) return;
-
-    Array.from(files).forEach(file => {
+  // Client-side image compression using canvas
+  const compressImage = (file, maxWidth = 1280, maxHeight = 1280, quality = 0.85) => {
+    return new Promise((resolve, reject) => {
+      if (!file.type.startsWith('image/')) {
+        reject(new Error("File is not an image"));
+        return;
+      }
       const reader = new FileReader();
-      reader.onload = (e) => {
-        const base64Str = e.target.result.split(',')[1];
+      reader.onload = (event) => {
+        const img = new window.Image();
+        img.onload = () => {
+          let width = img.width;
+          let height = img.height;
+
+          // Resize calculations keeping aspect ratio
+          if (width > height) {
+            if (width > maxWidth) {
+              height = Math.round((height * maxWidth) / width);
+              width = maxWidth;
+            }
+          } else {
+            if (height > maxHeight) {
+              width = Math.round((width * maxHeight) / height);
+              height = maxHeight;
+            }
+          }
+
+          const canvas = document.createElement('canvas');
+          canvas.width = width;
+          canvas.height = height;
+
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, width, height);
+
+          // Get compressed data url
+          const compressedDataUrl = canvas.toDataURL('image/jpeg', quality);
+          const base64Str = compressedDataUrl.split(',')[1];
+          const approxSizeBytes = Math.round((base64Str.length * 3) / 4);
+
+          resolve({
+            url: compressedDataUrl,
+            base64: base64Str,
+            name: file.name.replace(/\.[^/.]+$/, "") + ".jpg",
+            mimeType: "image/jpeg",
+            size: approxSizeBytes
+          });
+        };
+        img.onerror = (err) => reject(err);
+        img.src = event.target.result;
+      };
+      reader.onerror = (err) => reject(err);
+      reader.readAsDataURL(file);
+    });
+  };
+
+  // Image Upload handler for multiple pages with client-side compression
+  const handleImageFiles = async (files) => {
+    if (!files || files.length === 0) return;
+    
+    setApiLogs(prev => [...prev, "Compressing uploaded worksheet image pages..."]);
+
+    const filesArray = Array.from(files);
+    for (const file of filesArray) {
+      try {
+        const compressed = await compressImage(file);
         setUploadedImages(prev => [
           ...prev,
           {
-            url: e.target.result,
-            base64: base64Str,
-            name: file.name,
-            mimeType: file.type || "image/jpeg"
+            url: compressed.url,
+            base64: compressed.base64,
+            name: compressed.name,
+            mimeType: compressed.mimeType
           }
         ]);
-        setApiLogs(prev => [...prev, `Uploaded answer sheet page: ${file.name} (${Math.round(file.size/1024)} KB)`]);
-      };
-      reader.readAsDataURL(file);
-    });
+        setApiLogs(prev => [
+          ...prev, 
+          `Processed sheet: ${compressed.name} (Compressed: ${Math.round(file.size / 1024)} KB ➡️ ${Math.round(compressed.size / 1024)} KB)`
+        ]);
+      } catch (err) {
+        console.error("Compression failed for: ", file.name, err);
+        setApiLogs(prev => [...prev, `Failed to compress ${file.name}: ${err.message}`]);
+      }
+    }
   };
 
   // AI Evaluation execution

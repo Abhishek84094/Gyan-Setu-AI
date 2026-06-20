@@ -106,6 +106,22 @@ export default function PracticeArea({ activeQuestion, onGraded, onStartAdaptive
     }
   }, []);
 
+  const transcribeRecordedAudio = async (blob) => {
+    if (!blob) return;
+    setApiLogs(prev => [...prev, "Initiating secure audio transcription..."]);
+    try {
+      const apiText = await transcribeAudioWithFallback(blob, (logMsg) => {
+        setApiLogs(prev => [...prev, logMsg]);
+      });
+      if (apiText) {
+        setTranscribedText(apiText);
+      }
+    } catch (e) {
+      console.error("Audio transcription failed:", e);
+      setApiLogs(prev => [...prev, `Transcription failed: ${e.message}. Using speech preview.`]);
+    }
+  };
+
   // Voice recording toggle using standard MediaRecorder API
   const handleToggleVoice = async () => {
     if (isRecordingRef.current) {
@@ -134,11 +150,14 @@ export default function PracticeArea({ activeQuestion, onGraded, onStartAdaptive
           if (e.data.size > 0) chunks.push(e.data);
         };
 
-        recorder.onstop = () => {
+        recorder.onstop = async () => {
           const blob = new Blob(chunks, { type: 'audio/wav' });
           setAudioBlob(blob);
           setAudioUrl(URL.createObjectURL(blob));
           stream.getTracks().forEach(track => track.stop());
+
+          // Automatically trigger the secure backend transcription right after recording stops!
+          await transcribeRecordedAudio(blob);
         };
 
         recorder.start();
@@ -264,9 +283,7 @@ export default function PracticeArea({ activeQuestion, onGraded, onStartAdaptive
     if (activeTab === "type") {
       answerContent = typedAnswer;
     } else if (activeTab === "voice") {
-      answerContent = transcribedText;
-      // If we have an actual audio blob and a Groq Key configured, transcribe via API fallback
-      if (audioBlob && (import.meta.env.VITE_GROQ_API_KEY || import.meta.env.VITE_GEMINI_API_KEY)) {
+      if (!transcribedText && audioBlob) {
         setApiLogs(prev => [...prev, "Sending recorded wav audio to transcribing APIs..."]);
         try {
           const apiText = await transcribeAudioWithFallback(audioBlob, (logMsg) => {
@@ -276,7 +293,10 @@ export default function PracticeArea({ activeQuestion, onGraded, onStartAdaptive
           setTranscribedText(apiText);
         } catch (e) {
           console.warn("Transcription fallbacks failed, using live Web Speech text", e);
+          answerContent = transcribedText;
         }
+      } else {
+        answerContent = transcribedText;
       }
     } else {
       // Photo Upload (Evaluating handwriting pages)
@@ -514,7 +534,7 @@ Step 2: D = b^2 - 4ac = ..."
             <div className="mt-5 border-t border-gray-850 pt-5 flex justify-end">
               <button
                 onClick={handleGradeAnswer}
-                disabled={isGrading || (activeTab === "type" && !typedAnswer) || (activeTab === "voice" && !transcribedText) || (activeTab === "photo" && uploadedImages.length === 0)}
+                disabled={isGrading || (activeTab === "type" && !typedAnswer) || (activeTab === "voice" && !transcribedText && !audioBlob) || (activeTab === "photo" && uploadedImages.length === 0)}
                 className="flex items-center gap-1.5 px-6 py-2.5 bg-indigo-600 hover:bg-indigo-500 disabled:bg-gray-800 text-white disabled:text-gray-500 rounded-xl transition-all shadow-lg shadow-indigo-600/20 disabled:shadow-none text-sm font-semibold cursor-pointer"
               >
                 {isGrading ? (

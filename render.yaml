@@ -18,9 +18,8 @@ services:
         sync: false
 
   # 2. Vite React Application (Frontend Static Site)
-  - type: web
+  - type: static
     name: gyan-setu-frontend
-    runtime: static
     repo: https://github.com/Abhishek84094/Gyan-Setu-AI.git
     branch: main
     buildCommand: npm run build

@@ -1,0 +1,62 @@
+@import "tailwindcss";
+
+/* Base Overrides for a Premium Dark Look */
+body {
+  margin: 0;
+  background-color: #030712; /* gray-950 */
+  color: #f3f4f6; /* gray-100 */
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  overflow-x: hidden;
+}
+
+/* Custom Premium Scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #090d16;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #1f2937;
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #374151;
+}
+
+/* Custom Micro-animations */
+@keyframes pulseGlow {
+  0%, 100% {
+    opacity: 0.15;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.25;
+    transform: scale(1.05);
+  }
+}
+
+.animate-pulse-glow {
+  animation: pulseGlow 8s infinite ease-in-out;
+}
+
+/* Custom utilities */
+.bg-gray-850 {
+  background-color: #171d2c;
+}
+
+.border-gray-805 {
+  border-color: #1f293d;
+}
+
+.border-gray-750 {
+  border-color: #2e3b52;
+}
+
+.bg-gray-955 {
+  background-color: #0b111e;
+}

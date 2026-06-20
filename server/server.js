@@ -335,6 +335,10 @@ app.post('/api/transcribe', upload.single('audio'), async (req, res) => {
   });
 });
 
-app.listen(PORT, () => {
-  console.log(`[SERVER] Gyan-Setu Secure API running on port ${PORT}`);
-});
+if (!process.env.VERCEL) {
+  app.listen(PORT, () => {
+    console.log(`[SERVER] Gyan-Setu Secure API running on port ${PORT}`);
+  });
+}
+
+export default app;

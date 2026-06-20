@@ -1,6 +1,6 @@
 import { evaluateAnswerLocally } from './mockGrader';
 
-const backendUrl = import.meta.env.VITE_BACKEND_URL || "http://localhost:5000";
+const backendUrl = import.meta.env.VITE_BACKEND_URL || (import.meta.env.PROD ? "" : "http://localhost:5000");
 
 /**
  * Multi-LLM Grading Service - Proxy through secure Backend Server

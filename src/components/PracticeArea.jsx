@@ -21,9 +21,9 @@ export default function PracticeArea({ activeQuestion, onGraded, onStartAdaptive
   const [mediaRecorder, setMediaRecorder] = useState(null);
   const [recognition, setRecognition] = useState(null);
 
-  // Evaluation States
   const [isGrading, setIsGrading] = useState(false);
   const [gradeResult, setGradeResult] = useState(null);
+  const [gradeError, setGradeError] = useState(null);
   const [apiLogs, setApiLogs] = useState([]);
 
   const fileInputRef = useRef(null);
@@ -38,6 +38,7 @@ export default function PracticeArea({ activeQuestion, onGraded, onStartAdaptive
     setAudioBlob(null);
     setAudioUrl(null);
     setGradeResult(null);
+    setGradeError(null);
     setApiLogs([]);
     setIsDictating(false);
     isRecordingRef.current = false;
@@ -275,6 +276,7 @@ export default function PracticeArea({ activeQuestion, onGraded, onStartAdaptive
   const handleGradeAnswer = async () => {
     setIsGrading(true);
     setGradeResult(null);
+    setGradeError(null);
     setApiLogs(["Grade command received. Preparing workspace..."]);
 
     let answerContent = "";
@@ -335,8 +337,10 @@ export default function PracticeArea({ activeQuestion, onGraded, onStartAdaptive
         result.generalFeedback
       );
     } catch (error) {
-      console.error(error);
-      setApiLogs(prev => [...prev, `Critical error: ${error.message}. Evaluation halted.`]);
+      console.error("Grading failed:", error);
+      const msg = error.message || "An unexpected error occurred during grading.";
+      setApiLogs(prev => [...prev, `Error: ${msg}`]);
+      setGradeError(msg);
     } finally {
       setIsGrading(false);
     }
@@ -550,6 +554,31 @@ Step 2: D = b^2 - 4ac = ..."
             </div>
 
           </div>
+        </div>
+      ) : gradeError ? (
+        /* GRADING ERROR VIEW */
+        <div className="bg-gray-900 border border-rose-900/50 p-6 rounded-2xl space-y-4">
+          <div className="flex items-start gap-3">
+            <AlertCircle className="w-6 h-6 text-rose-500 flex-shrink-0 mt-0.5" />
+            <div>
+              <h3 className="text-sm font-bold text-rose-400">Grading Could Not Complete</h3>
+              <p className="text-xs text-gray-400 mt-1 leading-relaxed">{gradeError}</p>
+            </div>
+          </div>
+          <div className="bg-gray-950 border border-gray-800 rounded-xl p-3 space-y-1 font-mono text-[10px] text-gray-500 max-h-32 overflow-y-auto">
+            {apiLogs.map((log, i) => (
+              <div key={i} className="flex gap-1.5 items-start">
+                <span className="text-gray-600">›</span>
+                <span>{log}</span>
+              </div>
+            ))}
+          </div>
+          <button
+            onClick={() => { setGradeError(null); setApiLogs([]); }}
+            className="w-full py-2.5 bg-gray-800 hover:bg-gray-750 text-gray-200 rounded-xl text-xs font-bold border border-gray-700 transition-all cursor-pointer"
+          >
+            ← Try Again
+          </button>
         </div>
       ) : (
         /* GRADING SUMMARY VIEW */

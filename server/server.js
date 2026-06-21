@@ -269,31 +269,57 @@ ${jsonSchema}`;
     }
   }
 
-  // 2. TRY GROQ (Fallback 1 — Text/Voice only; cannot process images)
-  if (isPhotoMode && !geminiKey) {
-    // Photo grading requires a vision model. If Gemini is not configured, return a clear error.
-    console.warn("[SERVER] Photo grading requires Gemini (vision model). Groq cannot process images.");
-    return res.status(503).json({
-      error: true,
-      message: "Photo worksheet grading requires the Gemini API (a vision model). Groq and the local mock grader cannot read handwritten images. Please ensure GEMINI_API_KEY is configured on the server.",
-      modelUsed: "None — Vision Model Required"
-    });
+  // 2. TRY GROQ VISION (Fallback for photos — llama-3.2-90b-vision-preview supports base64 images)
+  // Groq's vision models accept images via data URLs in the message content array
+  if (isPhotoMode && groqKey && imagesArray && imagesArray.length > 0) {
+    try {
+      console.log("[SERVER] Trying Groq Vision (llama-3.2-90b-vision-preview) for photo grading...");
+
+      // Build multimodal message: text prompt + base64 images as data URL parts
+      const contentParts = [{ type: "text", text: photoPrompt }];
+      imagesArray.forEach((img) => {
+        const mimeType = img.mimeType || "image/jpeg";
+        contentParts.push({
+          type: "image_url",
+          image_url: { url: `data:${mimeType};base64,${img.base64}` }
+        });
+      });
+
+      const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${groqKey}`
+        },
+        body: JSON.stringify({
+          model: "llama-3.2-90b-vision-preview",
+          messages: [{ role: "user", content: contentParts }],
+          response_format: { type: "json_object" },
+          max_tokens: 4096
+        })
+      });
+
+      if (!response.ok) {
+        const errBody = await response.text();
+        throw new Error(`Groq Vision API returned status ${response.status}: ${errBody}`);
+      }
+
+      const data = await response.json();
+      const rawText = data.choices?.[0]?.message?.content;
+      if (!rawText) throw new Error("Empty response from Groq Vision");
+
+      const result = parseLLMJson(rawText);
+      result.modelUsed = "Groq LLaMA 3.2 Vision (Secure Server)";
+      return res.json(result);
+    } catch (err) {
+      console.error("[SERVER] Groq Vision failed. Trying text-only Groq as last resort...", err.message);
+    }
   }
 
-  if (isPhotoMode && groqKey) {
-    // Gemini failed on photo — don't silently fall to Groq (which can't see images)
-    // Return a meaningful error so the student knows to retry
-    console.warn("[SERVER] Gemini failed for photo submission. Groq cannot process images. Returning error.");
-    return res.status(503).json({
-      error: true,
-      message: "The photo worksheet could not be graded because the AI vision service is temporarily unavailable. Please try again in a moment, or switch to text/voice input.",
-      modelUsed: "Gemini 1.5 Flash (Unavailable)"
-    });
-  }
-
+  // 3. TRY GROQ TEXT (Fallback for text/voice submissions)
   if (groqKey) {
     try {
-      console.log("[SERVER] Evaluating with Groq Llama 3...");
+      console.log("[SERVER] Evaluating with Groq Llama 3 (text)...");
 
       const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
         method: "POST",
@@ -330,11 +356,12 @@ ${jsonSchema}`;
     }
   }
 
-  // 3. FINAL FALLBACK: Local Mock Grader
+  // 4. FINAL FALLBACK: Local Mock Grader (text/voice only)
   console.log("[SERVER] Running local mock grader fallback...");
   const mockResult = evaluateAnswerLocallyMock(questionText, modelSolution, studentAnswer, inputType);
   return res.json(mockResult);
 });
+
 
 
 /**

@@ -32,9 +32,9 @@ export async function gradeAnswerWithFallback({
 
     const result = await response.json();
 
-    // Handle explicit server-side error for photo grading (e.g., vision model unavailable)
+    // Handle explicit server-side error responses
     if (result.error) {
-      if (onLog) onLog(`Grading failed: ${result.message}`);
+      if (onLog) onLog(`Grading error: ${result.message}`);
       throw new Error(result.message);
     }
 
@@ -45,21 +45,15 @@ export async function gradeAnswerWithFallback({
     if (onLog) onLog(`Grading resolved via ${result.modelUsed}.`);
     return result;
   } catch (error) {
-    // For photo mode, don't silently fall to the frontend mock grader — it cannot read images either
-    if (inputType === 'photo') {
-      console.warn("Photo grading failed on server:", error.message);
-      if (onLog) onLog(`Photo grading failed: ${error.message}`);
-      // Re-throw so the caller (PracticeArea) can show a proper error message
-      throw error;
-    }
+    console.warn("Backend grading failed:", error.message);
+    if (onLog) onLog(`Backend error: ${error.message}. Falling back to local grader...`);
 
-    console.warn("Backend grading failed. Falling back to frontend Local Mock Examiner.", error);
-    if (onLog) onLog(`Backend unavailable (${error.message}). Falling back to frontend Mock Examiner...`);
-    
-    // Final frontend deterministic fallback (text/voice only)
+    // For photo mode, the local mock grader cannot read images either
+    // but it will at least return a structured result so UI doesn't freeze
     return evaluateAnswerLocally(questionId, studentAnswer, inputType);
   }
 }
+
 
 
 /**

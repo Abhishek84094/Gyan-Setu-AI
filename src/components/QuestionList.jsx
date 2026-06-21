@@ -6,9 +6,13 @@ export default function QuestionList({ questions, activeQuestionId, onSelectQues
   const [selectedMarks, setSelectedMarks] = useState("all");
   const [selectedDifficulty, setSelectedDifficulty] = useState("all");
   const [selectedTopic, setSelectedTopic] = useState("all");
+  const [showHotOnly, setShowHotOnly] = useState(false);
 
   // Get unique subtopics for filtering
   const subTopics = ["all", ...new Set(questions.map(q => q.subTopic))];
+
+  // Count board-repeated (isHot) questions
+  const hotCount = questions.filter(q => q.isHot).length;
 
   // Filter the list
   const filteredQuestions = questions.filter(q => {
@@ -17,9 +21,11 @@ export default function QuestionList({ questions, activeQuestionId, onSelectQues
     const matchesMarks = selectedMarks === "all" ? true : q.marks === parseInt(selectedMarks);
     const matchesDifficulty = selectedDifficulty === "all" ? true : q.difficulty.toLowerCase() === selectedDifficulty.toLowerCase();
     const matchesTopic = selectedTopic === "all" ? true : q.subTopic === selectedTopic;
+    const matchesHot = showHotOnly ? q.isHot === true : true;
 
-    return matchesSearch && matchesMarks && matchesDifficulty && matchesTopic;
+    return matchesSearch && matchesMarks && matchesDifficulty && matchesTopic && matchesHot;
   });
+
 
   return (
     <div className="bg-gray-900 border border-gray-850 rounded-2xl p-4 h-[75vh] flex flex-col justify-between">
@@ -72,7 +78,19 @@ export default function QuestionList({ questions, activeQuestionId, onSelectQues
         {/* Question Counter */}
         <div className="flex justify-between items-center text-[10px] text-gray-400 bg-gray-950/40 p-2 rounded-lg border border-gray-805">
           <span>Showing: <strong>{filteredQuestions.length}</strong> / {questions.length}</span>
-          <span className="flex items-center gap-1"><Flame className="w-3.5 h-3.5 text-amber-500 fill-amber-500 animate-pulse" /> Board Repeated</span>
+          <button
+            onClick={() => setShowHotOnly(prev => !prev)}
+            className={`flex items-center gap-1 px-2 py-0.5 rounded-md font-semibold transition-all cursor-pointer ${
+              showHotOnly 
+                ? 'bg-amber-500/20 text-amber-400 border border-amber-500/40' 
+                : 'text-gray-500 hover:text-amber-400'
+            }`}
+            title="Filter to show only 10-year board repeated questions"
+          >
+            <Flame className="w-3.5 h-3.5 text-amber-500 fill-amber-500 animate-pulse" />
+            Board Repeated
+            <span className="ml-1 bg-amber-500/20 text-amber-400 px-1.5 py-0 rounded-full font-mono text-[9px]">{hotCount}</span>
+          </button>
         </div>
 
         {/* Question Scroll List */}

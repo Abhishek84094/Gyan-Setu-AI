@@ -260,30 +260,7 @@ export default function Login({ onAuthSuccess }) {
           </button>
         </div>
 
-        {/* Quick Demo Credentials Help */}
-        <div className="mt-8 border-t border-gray-850 pt-5 relative z-10">
-          <span className="block text-[9px] uppercase font-bold text-gray-500 tracking-wider mb-3 text-center">Developer Demo Shortcuts</span>
-          <div className="grid grid-cols-3 gap-2">
-            <button
-              onClick={() => handleDemoCredentials("student")}
-              className="py-1.5 px-2 bg-gray-950 border border-gray-805 text-gray-400 hover:text-white rounded-lg text-[9px] font-bold text-center"
-            >
-              Demo Student
-            </button>
-            <button
-              onClick={() => handleDemoCredentials("teacher")}
-              className="py-1.5 px-2 bg-gray-950 border border-gray-805 text-gray-400 hover:text-white rounded-lg text-[9px] font-bold text-center"
-            >
-              Demo Teacher
-            </button>
-            <button
-              onClick={() => handleDemoCredentials("parent")}
-              className="py-1.5 px-2 bg-gray-950 border border-gray-805 text-gray-400 hover:text-white rounded-lg text-[9px] font-bold text-center"
-            >
-              Demo Parent
-            </button>
-          </div>
-        </div>
+
 
       </div>
     </div>

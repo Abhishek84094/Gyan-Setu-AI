@@ -1,12 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { BookOpen, Award, FileSpreadsheet, Keyboard, Settings, Flame, Layers, Presentation, RotateCcw, AlertTriangle, LogOut, User } from 'lucide-react';
+import { BookOpen, Award, FileSpreadsheet, Keyboard, Flame, Layers, Presentation, RotateCcw, AlertTriangle, LogOut, User, X } from 'lucide-react';
 import { questions as coreQuestions } from './data/questions';
 import QuestionList from './components/QuestionList';
 import PracticeArea from './components/PracticeArea';
 import CheatSheet from './components/CheatSheet';
 import ReportPanel from './components/ReportPanel';
 import SlidesDeck from './components/SlidesDeck';
-import SettingsModal from './components/SettingsModal';
 
 // Multi-role service imports
 import Login from './components/Login';
@@ -24,7 +23,8 @@ export default function App() {
   const [activeQuestionId, setActiveQuestionId] = useState(1);
   const [questionStatuses, setQuestionStatuses] = useState({}); // { [id]: "correct" | "partial" | "incorrect" }
   const [practiceHistory, setPracticeHistory] = useState({}); // { [id]: scoredMarks }
-  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false); // kept for future use, not exposed in UI
+  const [isSignOutConfirmOpen, setIsSignOutConfirmOpen] = useState(false);
 
   // Adaptive Drill State
   const [drillTopic, setDrillTopic] = useState(null); // String name of topic or null
@@ -107,14 +107,17 @@ export default function App() {
   };
 
   const handleSignOut = async () => {
-    if (window.confirm("Are you sure you want to sign out?")) {
-      await supabaseSignOut();
-      setUser(null);
-      setQuestionStatuses({});
-      setPracticeHistory({});
-      setDrillTopic(null);
-      setDrillQuestions([]);
-    }
+    setIsSignOutConfirmOpen(true);
+  };
+
+  const confirmSignOut = async () => {
+    setIsSignOutConfirmOpen(false);
+    await supabaseSignOut();
+    setUser(null);
+    setQuestionStatuses({});
+    setPracticeHistory({});
+    setDrillTopic(null);
+    setDrillQuestions([]);
   };
 
   // Sync state with Supabase database & local cache
@@ -315,15 +318,6 @@ export default function App() {
               </div>
             </div>
 
-            {/* Developer Settings cog */}
-            <button
-              onClick={() => setIsSettingsOpen(true)}
-              title="AI settings config"
-              className="p-2 bg-gray-900 hover:bg-gray-850 text-gray-400 hover:text-white rounded-xl transition-colors border border-gray-850 cursor-pointer"
-            >
-              <Settings className="w-4 h-4" />
-            </button>
-
             {/* Sign Out Button */}
             <button
               onClick={handleSignOut}
@@ -423,8 +417,37 @@ export default function App() {
         </div>
       </footer>
 
-      {/* Developer Settings Modal overlay */}
-      <SettingsModal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} />
+
+      {/* Custom Sign-Out Confirmation Modal */}
+      {isSignOutConfirmOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+          <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6 w-80 shadow-2xl space-y-5 animate-fade-in">
+            <div className="flex items-start justify-between">
+              <div>
+                <h3 className="text-sm font-bold text-white">Sign out of GyanSetu?</h3>
+                <p className="text-xs text-gray-400 mt-1">Your progress is saved. You can sign back in anytime.</p>
+              </div>
+              <button onClick={() => setIsSignOutConfirmOpen(false)} className="text-gray-500 hover:text-white p-1 cursor-pointer">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setIsSignOutConfirmOpen(false)}
+                className="flex-1 py-2.5 text-xs font-semibold text-gray-300 bg-gray-800 hover:bg-gray-750 border border-gray-700 rounded-xl transition-all cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmSignOut}
+                className="flex-1 py-2.5 text-xs font-bold text-white bg-rose-600 hover:bg-rose-500 rounded-xl transition-all cursor-pointer"
+              >
+                Sign Out
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );

@@ -163,30 +163,38 @@ MAXIMUM MARKS: ${maxMarks}
 STEP-WISE MARKING SCHEME:
 ${modelSolution.map((s, i) => `Step ${i + 1} [Max ${s.marks} marks]: ${s.description}`).join("\n")}
 
-PHOTO SUBMISSION — READ IMAGES, NOT TEXT:
-The student submitted HANDWRITTEN WORKSHEET IMAGES. These images are attached to this message.
-The "studentAnswer" text field only contains a file count placeholder — DO NOT use it to grade.
-YOUR ACTUAL TASK: Carefully examine each attached image page by page. Use OCR to read every equation,
-number, symbol, step, and calculation that the student has handwritten. Grade based ONLY on what
-you can actually read in the images.
+PHOTO SUBMISSION — READ ATTACHED IMAGES:
+The student submitted HANDWRITTEN WORKSHEET IMAGES attached to this message.
+DO NOT use the "studentAnswer" text field to grade — it is just a placeholder.
+You must CAREFULLY OCR every handwritten line from the images before grading.
 
-RULES FOR PHOTO GRADING:
-1. READ the handwriting in all attached images carefully — look at every line of working shown.
-2. DO NOT say "no answer provided" — the student's work is in the attached images.
-3. QUOTE what you can read from the handwriting for each step (e.g., "Student wrote: Let x = usual speed, x+250 = new speed").
-4. COMPARE the student's actual written numbers/values to the correct mathematical values.
-5. If the student's written result is WRONG (e.g., wrong equation, wrong factorisation), flag it and deduct marks.
-6. If the student wrote the right method but made an arithmetic error in the written calculation, award PARTIAL marks.
-7. If a step is not visible or not attempted in any image, award ZERO marks for that step.
-8. NEVER award marks based on what the correct answer should be — only on what is actually written in the images.
+CRITICAL OCR ACCURACY RULES — READ BEFORE GRADING:
+- SURDS and ROOTS: √3 means "square root of 3" (NOT the number 2). 2√2 means "2 times root 2" (NOT -√2).
+  Handwritten surds have a tick/checkmark shape (√) followed by the radicand. Read them as √n, not as integers.
+- COEFFICIENTS with SURDS: "2√2" is TWO times ROOT TWO. "4√3" is FOUR times ROOT THREE. Do NOT drop the coefficient.
+- NEGATIVE SIGNS: a minus (−) in front of a term must be read carefully. −2√3 means negative two root three.
+- SQUARED TERMS: (2√2)² means two-root-two ALL squared = 4×2 = 8. Read the bracket carefully.
+- EXPONENTS: x² is x-squared, not x2. a = √3 is a equals root-3, not a equals 2.
+- LOOK TWICE: Before writing your OCR reading, look at each symbol carefully a second time.
+  If you see a tick/radical sign (√), it is a surd — NEVER replace it with a digit.
+
+PHOTO GRADING RULES:
+1. OCR every handwritten line image by image before you begin grading.
+2. DO NOT say "no answer provided" — the student's work is in the images.
+3. QUOTE exactly what you read from the handwriting for each step.
+4. COMPARE the student's actual written values to the correct mathematical values.
+5. If the student's written result is WRONG, flag it and deduct marks.
+6. If the student wrote the right method but computed the wrong number, award PARTIAL marks.
+7. If a step is not visible in any image, award ZERO for that step.
+8. NEVER award or deduct marks based on the correct answer — only on what is actually in the images.
 ${markingCriteria}
 
 REQUIRED CONTENT PER STEP:
-For each step you must identify from the images:
-a) studentWrote — OCR quote of what the student actually wrote for this step in their handwriting
+For each step identify from the images:
+a) studentWrote — Exact OCR of what the student handwrote for this step (use proper surd notation, e.g. √3 not 2)
 b) correctAnswer — The mathematically correct working and result for this step
-c) errorFound — null if correct, or specific description of the exact mistake visible in the handwriting
-d) feedback — Clear teacher-like explanation of what was right/wrong and why marks were given/deducted
+c) errorFound — null if the student's step is correct, or specific description of the exact mistake visible in the handwriting
+d) feedback — Clear teacher explanation of what was right/wrong and why marks were given/deducted
 ${jsonSchema}`;
 
   // ─── TEXT/VOICE MODE PROMPT — strict reading of studentAnswer text ─────────
@@ -269,51 +277,65 @@ ${jsonSchema}`;
     }
   }
 
-  // 2. TRY GROQ VISION (Fallback for photos — llama-3.2-90b-vision-preview supports base64 images)
-  // Groq's vision models accept images via data URLs in the message content array
+  // 2. TRY GROQ VISION (Fallback for photos)
+  // IMPORTANT: Groq vision models do NOT support response_format: json_object
+  // We send without it and rely on parseLLMJson to extract JSON from the response
   if (isPhotoMode && groqKey && imagesArray && imagesArray.length > 0) {
-    try {
-      console.log("[SERVER] Trying Groq Vision (llama-3.2-90b-vision-preview) for photo grading...");
+    // Build multimodal message: text prompt + base64 images as data URL parts
+    const contentParts = [{ type: "text", text: photoPrompt }];
+    imagesArray.forEach((img) => {
+      const mimeType = img.mimeType || "image/jpeg";
+      contentParts.push({
+        type: "image_url",
+        image_url: { url: `data:${mimeType};base64,${img.base64}` }
+      });
+    });
 
-      // Build multimodal message: text prompt + base64 images as data URL parts
-      const contentParts = [{ type: "text", text: photoPrompt }];
-      imagesArray.forEach((img) => {
-        const mimeType = img.mimeType || "image/jpeg";
-        contentParts.push({
-          type: "image_url",
-          image_url: { url: `data:${mimeType};base64,${img.base64}` }
+    // Try Llama 4 Scout first (newer, better vision OCR), then fall back to Llama 3.2 90B Vision
+    const visionModels = [
+      { model: "meta-llama/llama-4-scout-17b-16e-instruct", label: "Groq LLaMA 4 Scout Vision" },
+      { model: "llama-3.2-90b-vision-preview", label: "Groq LLaMA 3.2 Vision" }
+    ];
+
+    for (const { model, label } of visionModels) {
+      try {
+        console.log(`[SERVER] Trying ${label} for photo grading...`);
+
+        const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${groqKey}`
+          },
+          body: JSON.stringify({
+            model,
+            messages: [{ role: "user", content: contentParts }],
+            // NOTE: response_format is intentionally omitted — vision models don't support json_object mode
+            // parseLLMJson will extract JSON from the free-text response
+            max_tokens: 4096
+          })
         });
-      });
 
-      const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${groqKey}`
-        },
-        body: JSON.stringify({
-          model: "llama-3.2-90b-vision-preview",
-          messages: [{ role: "user", content: contentParts }],
-          response_format: { type: "json_object" },
-          max_tokens: 4096
-        })
-      });
+        if (!response.ok) {
+          const errBody = await response.text();
+          throw new Error(`${label} returned ${response.status}: ${errBody}`);
+        }
 
-      if (!response.ok) {
-        const errBody = await response.text();
-        throw new Error(`Groq Vision API returned status ${response.status}: ${errBody}`);
+        const data = await response.json();
+        const rawText = data.choices?.[0]?.message?.content;
+        if (!rawText) throw new Error(`Empty response from ${label}`);
+
+        const result = parseLLMJson(rawText);
+        result.modelUsed = `${label} (Secure Server)`;
+        console.log(`[SERVER] Photo graded successfully by ${label}`);
+        return res.json(result);
+      } catch (err) {
+        console.error(`[SERVER] ${label} failed:`, err.message);
+        // Continue to next model in the loop
       }
-
-      const data = await response.json();
-      const rawText = data.choices?.[0]?.message?.content;
-      if (!rawText) throw new Error("Empty response from Groq Vision");
-
-      const result = parseLLMJson(rawText);
-      result.modelUsed = "Groq LLaMA 3.2 Vision (Secure Server)";
-      return res.json(result);
-    } catch (err) {
-      console.error("[SERVER] Groq Vision failed. Trying text-only Groq as last resort...", err.message);
     }
+
+    console.error("[SERVER] All Groq vision models failed for photo grading.");
   }
 
   // 3. TRY GROQ TEXT (Fallback for text/voice submissions)

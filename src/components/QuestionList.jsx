@@ -75,21 +75,23 @@ export default function QuestionList({ questions, activeQuestionId, onSelectQues
           </div>
         </div>
 
-        {/* Question Counter */}
-        <div className="flex justify-between items-center text-[10px] text-gray-400 bg-gray-950/40 p-2 rounded-lg border border-gray-805">
-          <span>Showing: <strong>{filteredQuestions.length}</strong> / {questions.length}</span>
+        {/* Question Counter + Hot Filter */}
+        <div className="space-y-2">
+          <div className="flex justify-between items-center text-[10px] text-gray-400 bg-gray-950/40 p-2 rounded-lg border border-gray-805">
+            <span>Showing: <strong>{filteredQuestions.length}</strong> / {questions.length}</span>
+            <span className="text-gray-600 text-[9px]">{hotCount} board-repeated questions</span>
+          </div>
           <button
             onClick={() => setShowHotOnly(prev => !prev)}
-            className={`flex items-center gap-1 px-2 py-0.5 rounded-md font-semibold transition-all cursor-pointer ${
+            className={`w-full flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-[10px] font-bold transition-all cursor-pointer border ${
               showHotOnly 
-                ? 'bg-amber-500/20 text-amber-400 border border-amber-500/40' 
-                : 'text-gray-500 hover:text-amber-400'
+                ? 'bg-amber-500/15 text-amber-400 border-amber-500/40' 
+                : 'bg-gray-950/40 text-gray-500 hover:text-amber-400 border-gray-805 hover:border-amber-500/30'
             }`}
             title="Filter to show only 10-year board repeated questions"
           >
-            <Flame className="w-3.5 h-3.5 text-amber-500 fill-amber-500 animate-pulse" />
-            Board Repeated
-            <span className="ml-1 bg-amber-500/20 text-amber-400 px-1.5 py-0 rounded-full font-mono text-[9px]">{hotCount}</span>
+            <Flame className="w-3.5 h-3.5 text-amber-500 fill-amber-500" />
+            {showHotOnly ? `Showing ${filteredQuestions.length} Board Classics — Click to Reset` : `🔥 Show Only Board Repeated (${hotCount} questions)`}
           </button>
         </div>
 
@@ -140,17 +142,21 @@ export default function QuestionList({ questions, activeQuestionId, onSelectQues
                     </div>
                     
                     <div className="flex items-center gap-1">
-                      {q.isHot && (
-                        <span className="flex items-center gap-0.5 bg-amber-500/10 text-amber-500 px-1 py-0.25 rounded font-bold uppercase tracking-wider text-[9px] animate-pulse">
-                          <Flame className="w-2.5 h-2.5 fill-amber-500" /> HOT
-                        </span>
-                      )}
                       <span className={`px-1 rounded text-[9px] font-medium ${
                         q.difficulty === "Easy" ? "text-emerald-400" :
                         q.difficulty === "Medium" ? "text-amber-400" : "text-rose-400"
                       }`}>{q.difficulty}</span>
                     </div>
                   </div>
+
+                  {/* HOT Board Repeated Badge — shown prominently below header */}
+                  {q.isHot && (
+                    <div className="flex items-center gap-1.5 bg-amber-500/10 border border-amber-500/25 rounded-lg px-2 py-1">
+                      <Flame className="w-3 h-3 text-amber-400 fill-amber-400 flex-shrink-0" />
+                      <span className="text-[9px] font-bold text-amber-400 uppercase tracking-wide">10-Year Board Classic</span>
+                      <span className="text-[9px] text-amber-500/70 ml-auto">High Priority</span>
+                    </div>
+                  )}
 
                   {/* Question body snippet */}
                   <p className="text-gray-300 text-xs font-medium line-clamp-2 leading-relaxed">

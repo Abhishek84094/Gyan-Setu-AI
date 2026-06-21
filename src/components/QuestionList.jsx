@@ -140,23 +140,16 @@ export default function QuestionList({ questions, activeQuestionId, onSelectQues
                         {q.marks} {q.marks === 1 ? 'Mark' : 'Marks'}
                       </span>
                     </div>
-                    
-                    <div className="flex items-center gap-1">
-                      <span className={`px-1 rounded text-[9px] font-medium ${
-                        q.difficulty === "Easy" ? "text-emerald-400" :
-                        q.difficulty === "Medium" ? "text-amber-400" : "text-rose-400"
-                      }`}>{q.difficulty}</span>
+
+                    {/* Right side: HOT tag if board repeat, otherwise empty */}
+                    <div>
+                      {q.isHot ? (
+                        <span className="flex items-center gap-1 bg-amber-500/15 border border-amber-500/30 text-amber-400 px-2 py-0.5 rounded-md font-bold text-[9px] uppercase tracking-wide">
+                          <Flame className="w-2.5 h-2.5 fill-amber-400" /> Board Repeat
+                        </span>
+                      ) : null}
                     </div>
                   </div>
-
-                  {/* HOT Board Repeated Badge — shown prominently below header */}
-                  {q.isHot && (
-                    <div className="flex items-center gap-1.5 bg-amber-500/10 border border-amber-500/25 rounded-lg px-2 py-1">
-                      <Flame className="w-3 h-3 text-amber-400 fill-amber-400 flex-shrink-0" />
-                      <span className="text-[9px] font-bold text-amber-400 uppercase tracking-wide">10-Year Board Classic</span>
-                      <span className="text-[9px] text-amber-500/70 ml-auto">High Priority</span>
-                    </div>
-                  )}
 
                   {/* Question body snippet */}
                   <p className="text-gray-300 text-xs font-medium line-clamp-2 leading-relaxed">

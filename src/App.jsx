@@ -58,15 +58,20 @@ export default function App() {
       const dbQuestions = await getQuestions();
       if (dbQuestions && dbQuestions.length > 0) {
         // Map database fields to standard schema
-        const mapped = dbQuestions.map(q => ({
-          id: q.id,
-          question: q.question_text,
-          subTopic: q.sub_topic,
-          difficulty: q.difficulty,
-          marks: q.marks,
-          modelSolution: q.model_solution,
-          expectedAnswer: q.expected_answer
-        }));
+        // isHot is not stored in Supabase — merge it from local coreQuestions by ID
+        const mapped = dbQuestions.map(q => {
+          const localQ = coreQuestions.find(cq => cq.id === q.id);
+          return {
+            id: q.id,
+            question: q.question_text,
+            subTopic: q.sub_topic,
+            difficulty: q.difficulty,
+            marks: q.marks,
+            modelSolution: q.model_solution,
+            expectedAnswer: q.expected_answer,
+            isHot: localQ?.isHot ?? false
+          };
+        });
         setQuestions(mapped);
         if (mapped.length > 0) {
           setActiveQuestionId(mapped[0].id);

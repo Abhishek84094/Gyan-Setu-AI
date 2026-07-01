@@ -7,6 +7,8 @@ body {
   color: #f3f4f6; /* gray-100 */
   font-family: 'Inter', system-ui, -apple-system, sans-serif;
   overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 /* Custom Premium Scrollbars */
@@ -26,6 +28,15 @@ body {
 
 ::-webkit-scrollbar-thumb:hover {
   background: #374151;
+}
+
+/* Hide scrollbar but keep scroll functionality (for horizontal chip strips) */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
 }
 
 /* Custom Micro-animations */
@@ -60,3 +71,45 @@ body {
 .bg-gray-955 {
   background-color: #0b111e;
 }
+
+/* Mobile: ensure all interactive elements have minimum 44px touch targets */
+@media (max-width: 767px) {
+  button, a, [role="button"] {
+    min-height: 36px;
+  }
+
+  /* Reduce font sizes slightly on tiny screens */
+  .text-2xl {
+    font-size: 1.25rem;
+  }
+}
+
+/* Safe area insets for phones with notch / home indicator */
+@supports (padding: max(0px)) {
+  header {
+    padding-left: max(1rem, env(safe-area-inset-left));
+    padding-right: max(1rem, env(safe-area-inset-right));
+  }
+  
+  main {
+    padding-left: max(0.75rem, env(safe-area-inset-left));
+    padding-right: max(0.75rem, env(safe-area-inset-right));
+  }
+
+  footer {
+    padding-bottom: max(1.5rem, env(safe-area-inset-bottom));
+  }
+}
+
+/* Smooth scroll for the whole page */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Prevent text selection on UI buttons for better mobile feel */
+button {
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+}
+
+

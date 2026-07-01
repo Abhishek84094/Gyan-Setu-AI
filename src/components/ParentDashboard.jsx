@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Award, CheckCircle, AlertTriangle, FileText, ArrowRight, Share2, HelpCircle, RefreshCw, Activity, User, BookOpen } from 'lucide-react';
+import { Award, CheckCircle, AlertTriangle, FileText, ArrowRight, Share2, HelpCircle, RefreshCw, Activity, User, BookOpen, TrendingUp } from 'lucide-react';
 import { getSubmissions, getLinkedStudentProfile, getQuestions } from '../services/supabase';
+import { AccuracyRing, TopicBarChart, ScoreTrend } from './PerformanceChart';
 
 export default function ParentDashboard({ user }) {
   const [student, setStudent] = useState(null);
@@ -144,7 +145,7 @@ export default function ParentDashboard({ user }) {
       </div>
 
       {/* Accuracy & Metrics Summary row */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <div className="bg-gray-900 border border-gray-850 p-4 rounded-2xl">
           <span className="text-[10px] text-gray-500 uppercase font-bold tracking-wider block">Homework Completed</span>
           <div className="text-2xl font-black text-white font-mono mt-1">
@@ -167,7 +168,7 @@ export default function ParentDashboard({ user }) {
             {correctCount}
             <CheckCircle className="w-5 h-5 text-emerald-400" />
           </div>
-          <span className="text-[10px] text-gray-400 mt-2 block">Scored &ge; 80% marks</span>
+          <span className="text-[10px] text-gray-400 mt-2 block">Scored ≥ 80% marks</span>
         </div>
 
         <div className="bg-gray-900 border border-gray-850 p-4 rounded-2xl">
@@ -178,6 +179,50 @@ export default function ParentDashboard({ user }) {
           </div>
           <span className="text-[10px] text-gray-400 mt-2 block">Calculation or logic gaps</span>
         </div>
+      </div>
+
+      {/* ─── PERFORMANCE VISUALIZATION SECTION ─── */}
+      <div className="bg-gray-900 border border-gray-850 p-5 rounded-2xl space-y-5">
+        <div className="flex items-center gap-2 border-b border-gray-850 pb-3">
+          <TrendingUp className="w-4 h-4 text-emerald-400" />
+          <h3 className="text-sm font-bold text-white uppercase tracking-wider">{student?.name}'s Performance Analytics</h3>
+        </div>
+
+        {attemptedCount === 0 ? (
+          <p className="text-xs text-gray-500 italic text-center py-4">
+            {student?.name} hasn't practiced any questions yet. Analytics will appear here once they start.
+          </p>
+        ) : (
+          <>
+            {/* Accuracy Ring + Score Trend row */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 items-center">
+              <div className="flex flex-col items-center">
+                <AccuracyRing
+                  accuracy={avgAccuracy}
+                  size={140}
+                  strokeWidth={14}
+                  sublabel="Overall Accuracy"
+                  label={`${student?.name} — ${attemptedCount} questions done`}
+                />
+              </div>
+              <div className="space-y-3">
+                <span className="text-[10px] uppercase font-bold text-gray-500 tracking-wider block">Score Progress Over Time</span>
+                <ScoreTrend submissions={submissions} height={80} />
+                <div className="flex gap-4 text-[10px] justify-center">
+                  <span className="flex items-center gap-1 text-gray-400"><span className="w-2 h-2 rounded-full bg-emerald-400 inline-block" />{correctCount} Excellent</span>
+                  <span className="flex items-center gap-1 text-gray-400"><span className="w-2 h-2 rounded-full bg-amber-400 inline-block" />{partialCount} Partial</span>
+                  <span className="flex items-center gap-1 text-gray-400"><span className="w-2 h-2 rounded-full bg-rose-400 inline-block" />{incorrectCount} Needs Work</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Topic Performance Bars */}
+            <div className="space-y-3 border-t border-gray-850 pt-4">
+              <span className="text-[10px] uppercase font-bold text-gray-500 tracking-wider block">Topic-wise Performance</span>
+              <TopicBarChart topics={topicStats} maxBars={8} />
+            </div>
+          </>
+        )}
       </div>
 
       {/* Main Analysis Body */}

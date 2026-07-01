@@ -270,10 +270,10 @@ export default function App() {
             
             {/* Standard Student Routing tabs */}
             {user.role === 'student' && (
-              <nav className="flex items-center gap-1 bg-gray-950 p-1 rounded-xl border border-gray-900">
+              <nav className="flex items-center gap-1 bg-gray-950 p-1 rounded-xl border border-gray-900 overflow-x-auto max-w-[calc(100vw-120px)] scrollbar-hide">
                 <button
                   onClick={() => { setActiveTab("practice"); }}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg transition-all ${
+                  className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg transition-all shrink-0 ${
                     activeTab === "practice" 
                       ? 'bg-indigo-600 text-white' 
                       : 'text-gray-400 hover:text-white'
@@ -283,7 +283,7 @@ export default function App() {
                 </button>
                 <button
                   onClick={() => { setActiveTab("cheatsheet"); }}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg transition-all ${
+                  className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg transition-all shrink-0 ${
                     activeTab === "cheatsheet" 
                       ? 'bg-indigo-600 text-white' 
                       : 'text-gray-400 hover:text-white'
@@ -293,7 +293,7 @@ export default function App() {
                 </button>
                 <button
                   onClick={() => { setActiveTab("reports"); }}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg transition-all ${
+                  className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg transition-all shrink-0 ${
                     activeTab === "reports" 
                       ? 'bg-indigo-600 text-white' 
                       : 'text-gray-400 hover:text-white'
@@ -303,7 +303,7 @@ export default function App() {
                 </button>
                 <button
                   onClick={() => { setActiveTab("slides"); }}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg transition-all ${
+                  className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg transition-all shrink-0 ${
                     activeTab === "slides" 
                       ? 'bg-indigo-600 text-white' 
                       : 'text-gray-400 hover:text-white'
@@ -356,7 +356,7 @@ export default function App() {
       )}
 
       {/* Main Workspace Body */}
-      <main className="flex-grow max-w-7xl w-full mx-auto px-4 sm:px-6 py-8 relative z-10">
+      <main className="flex-grow max-w-7xl w-full mx-auto px-3 sm:px-6 py-4 sm:py-8 relative z-10">
         
         {/* Render Portal based on logged in user role */}
         {user.role === 'teacher' && <TeacherDashboard user={user} />}
@@ -366,11 +366,11 @@ export default function App() {
         {user.role === 'student' && (
           <>
             {activeTab === "practice" && (
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-start animate-in fade-in duration-200">
+              <div className="flex flex-col md:grid md:grid-cols-3 gap-4 md:gap-6 items-start">
                 
-                {/* Left Column: Navigation Sidebar */}
-                <div className="md:col-span-1">
-                  <div className="sticky top-24">
+                {/* Question Navigation (chip row on mobile, sidebar on desktop) */}
+                <div className="md:col-span-1 w-full">
+                  <div className="md:sticky md:top-24">
                     <QuestionList
                       questions={activeQuestionsList}
                       activeQuestionId={activeQuestionId}
@@ -380,8 +380,8 @@ export default function App() {
                   </div>
                 </div>
 
-                {/* Right Column: Question Workspace Area */}
-                <div className="md:col-span-2">
+                {/* Practice Workspace */}
+                <div className="md:col-span-2 w-full">
                   <PracticeArea
                     activeQuestion={currentQuestion}
                     onGraded={updateQuestionProgress}

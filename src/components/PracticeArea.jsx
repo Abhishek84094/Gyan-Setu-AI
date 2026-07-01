@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Keyboard, Mic, Image, Play, RefreshCw, Sparkles, Upload, AlertCircle, FileText, CheckCircle } from 'lucide-react';
+import { Keyboard, Mic, Image, Play, RefreshCw, Sparkles, Upload, AlertCircle, FileText, CheckCircle, Camera } from 'lucide-react';
 import { gradeAnswerWithFallback, transcribeAudioWithFallback } from '../services/llmService';
 import GradingPanel from './GradingPanel';
 
@@ -27,6 +27,7 @@ export default function PracticeArea({ activeQuestion, onGraded, onStartAdaptive
   const [apiLogs, setApiLogs] = useState([]);
 
   const fileInputRef = useRef(null);
+  const cameraInputRef = useRef(null);
   const recognitionRef = useRef(null);
   const isRecordingRef = useRef(false);
 
@@ -481,55 +482,85 @@ Step 2: D = b^2 - 4ac = ..."
             {/* PHOTO WORKSPACE */}
             {activeTab === "photo" && (
               <div className="space-y-5">
-                
-                {/* Upload Section */}
-                <div className="space-y-4">
-                  <input
-                    type="file"
-                    ref={fileInputRef}
-                    accept="image/*"
-                    multiple
-                    onChange={(e) => handleImageFiles(e.target.files)}
-                    className="hidden"
-                  />
+
+                {/* Hidden file inputs */}
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  accept="image/*"
+                  multiple
+                  onChange={(e) => handleImageFiles(e.target.files)}
+                  className="hidden"
+                />
+                {/* Camera input — capture="environment" invokes rear camera on mobile */}
+                <input
+                  type="file"
+                  ref={cameraInputRef}
+                  accept="image/*"
+                  capture="environment"
+                  onChange={(e) => handleImageFiles(e.target.files)}
+                  className="hidden"
+                />
+
+                {/* Upload Methods */}
+                <div className="grid grid-cols-2 gap-3">
+                  {/* Gallery Upload */}
                   <button
                     onClick={() => fileInputRef.current.click()}
-                    className="w-full border-2 border-dashed border-gray-800 hover:border-indigo-500/50 rounded-xl p-8 transition-all text-center flex flex-col items-center justify-center gap-2.5 group cursor-pointer bg-gray-950/20"
+                    className="border-2 border-dashed border-gray-800 hover:border-indigo-500/60 rounded-xl p-5 transition-all text-center flex flex-col items-center justify-center gap-2.5 group cursor-pointer bg-gray-950/20 active:scale-95"
                   >
-                    <Upload className="w-10 h-10 text-gray-500 group-hover:text-indigo-400 transition-colors" />
+                    <Upload className="w-8 h-8 text-gray-500 group-hover:text-indigo-400 transition-colors" />
                     <div>
-                      <span className="block text-sm font-semibold text-gray-200">Upload handwritten worksheet pages</span>
-                      <span className="block text-xs text-gray-500 mt-1">Supports uploading multiple pages (PNG, JPG)</span>
+                      <span className="block text-xs font-semibold text-gray-200">Upload from Gallery</span>
+                      <span className="block text-[10px] text-gray-500 mt-0.5">PNG, JPG — multiple pages</span>
                     </div>
                   </button>
 
-                  {/* Multiple Images Grid */}
-                  {uploadedImages.length > 0 && (
-                    <div className="space-y-2">
-                      <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-widest">
-                        Uploaded Answer Sheets ({uploadedImages.length} pages)
-                      </label>
-                      <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3">
-                        {uploadedImages.map((img, idx) => (
-                          <div key={idx} className="aspect-square border border-gray-805 rounded-xl overflow-hidden relative group bg-gray-950 flex items-center justify-center p-1 shadow-md">
-                            <img src={img.url} alt={`Worksheet Page ${idx + 1}`} className="w-full h-full object-cover rounded-lg" />
-                            <div className="absolute top-1.5 left-1.5 bg-black/75 backdrop-blur-xs text-[9px] px-1.5 py-0.5 rounded font-semibold text-indigo-400 font-mono">
-                              Pg {idx + 1}
-                            </div>
-                            <button
-                              onClick={() => {
-                                setUploadedImages(prev => prev.filter((_, i) => i !== idx));
-                              }}
-                              className="absolute inset-0 bg-black/75 opacity-0 group-hover:opacity-100 flex items-center justify-center text-xs text-rose-400 font-bold transition-opacity"
-                            >
-                              Remove
-                            </button>
-                          </div>
-                        ))}
-                      </div>
+                  {/* Camera Capture — native camera on mobile */}
+                  <button
+                    onClick={() => cameraInputRef.current.click()}
+                    className="border-2 border-dashed border-gray-800 hover:border-emerald-500/60 rounded-xl p-5 transition-all text-center flex flex-col items-center justify-center gap-2.5 group cursor-pointer bg-gray-950/20 active:scale-95"
+                  >
+                    <Camera className="w-8 h-8 text-gray-500 group-hover:text-emerald-400 transition-colors" />
+                    <div>
+                      <span className="block text-xs font-semibold text-gray-200">Take a Photo</span>
+                      <span className="block text-[10px] text-gray-500 mt-0.5">Opens camera directly</span>
                     </div>
-                  )}
+                  </button>
                 </div>
+
+                {/* Tip for mobile users */}
+                <div className="flex items-center gap-2 bg-indigo-950/20 border border-indigo-900/30 rounded-xl px-3 py-2">
+                  <Camera className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
+                  <span className="text-[10px] text-gray-400">On mobile, <strong className="text-gray-300">Take a Photo</strong> opens your camera instantly. Point at your handwritten worksheet and snap!</span>
+                </div>
+
+                {/* Multiple Images Grid */}
+                {uploadedImages.length > 0 && (
+                  <div className="space-y-2">
+                    <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-widest">
+                      Uploaded Answer Sheets ({uploadedImages.length} pages)
+                    </label>
+                    <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
+                      {uploadedImages.map((img, idx) => (
+                        <div key={idx} className="aspect-square border border-gray-805 rounded-xl overflow-hidden relative group bg-gray-950 flex items-center justify-center p-1 shadow-md">
+                          <img src={img.url} alt={`Worksheet Page ${idx + 1}`} className="w-full h-full object-cover rounded-lg" />
+                          <div className="absolute top-1.5 left-1.5 bg-black/75 backdrop-blur-xs text-[9px] px-1.5 py-0.5 rounded font-semibold text-indigo-400 font-mono">
+                            Pg {idx + 1}
+                          </div>
+                          <button
+                            onClick={() => {
+                              setUploadedImages(prev => prev.filter((_, i) => i !== idx));
+                            }}
+                            className="absolute inset-0 bg-black/75 opacity-0 group-hover:opacity-100 active:opacity-100 flex items-center justify-center text-xs text-rose-400 font-bold transition-opacity"
+                          >
+                            ✕ Remove
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
               </div>
             )}

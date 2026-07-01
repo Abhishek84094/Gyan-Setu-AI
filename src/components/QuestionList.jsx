@@ -28,7 +28,49 @@ export default function QuestionList({ questions, activeQuestionId, onSelectQues
 
 
   return (
-    <div className="bg-gray-900 border border-gray-850 rounded-2xl p-4 h-[75vh] flex flex-col justify-between">
+    <div>
+      {/* ── MOBILE: Horizontal scrollable chip row ── */}
+      <div className="md:hidden mb-4">
+        <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide snap-x snap-mandatory">
+          {questions.map((q) => {
+            const isActive = q.id === activeQuestionId;
+            const status = questionStatuses[q.id] || 'unanswered';
+            const dotColor =
+              status === 'correct' ? 'bg-emerald-400' :
+              status === 'partial' ? 'bg-amber-400' :
+              status === 'incorrect' ? 'bg-rose-400' : 'bg-gray-600';
+            return (
+              <button
+                key={q.id}
+                onClick={() => onSelectQuestion(q.id)}
+                className={`flex-shrink-0 snap-start flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold border transition-all active:scale-95 ${
+                  isActive
+                    ? 'bg-indigo-600 border-indigo-500 text-white shadow-lg shadow-indigo-600/20'
+                    : 'bg-gray-900 border-gray-800 text-gray-400'
+                }`}
+              >
+                <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${dotColor}`} />
+                Q{q.id}
+                {q.isHot && <span className="text-amber-400">🔥</span>}
+              </button>
+            );
+          })}
+        </div>
+        {/* Active question preview for mobile */}
+        {(() => {
+          const active = questions.find(q => q.id === activeQuestionId);
+          if (!active) return null;
+          return (
+            <div className="bg-gray-900 border border-gray-850 rounded-xl px-3 py-2 flex justify-between items-center text-xs">
+              <span className="text-gray-400 truncate flex-1 mr-2">{active.subTopic}</span>
+              <span className="text-indigo-400 font-mono font-bold shrink-0">{active.marks}M • {active.difficulty}</span>
+            </div>
+          );
+        })()}
+      </div>
+
+      {/* ── DESKTOP: Full vertical list (hidden on mobile) ── */}
+      <div className="hidden md:flex bg-gray-900 border border-gray-850 rounded-2xl p-4 h-[75vh] flex-col justify-between">
       <div className="space-y-4 flex-grow flex flex-col min-h-0">
         
         {/* Search Header */}
@@ -166,6 +208,7 @@ export default function QuestionList({ questions, activeQuestionId, onSelectQues
           )}
         </div>
 
+      </div>
       </div>
     </div>
   );

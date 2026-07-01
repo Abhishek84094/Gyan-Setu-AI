@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { PlusCircle, Award, FileSpreadsheet, Users, Trash2, CheckCircle, AlertTriangle, Sparkles, ArrowRight, RefreshCw, BarChart3 } from 'lucide-react';
+import { PlusCircle, Award, FileSpreadsheet, Users, Trash2, CheckCircle, AlertTriangle, Sparkles, ArrowRight, RefreshCw, BarChart3, TrendingUp } from 'lucide-react';
 import { getQuestions, addQuestion, getClassStudents, getSubmissions } from '../services/supabase';
+import { AccuracyRing, TopicBarChart, ScoreTrend } from './PerformanceChart';
 
 export default function TeacherDashboard({ user }) {
   const [activeTab, setActiveTab] = useState("analytics"); // "analytics" | "add_question"
@@ -230,9 +231,65 @@ export default function TeacherDashboard({ user }) {
                     <p className="text-xs text-gray-400 mt-0.5">Comprehensive step-wise AI grading details</p>
                   </div>
                   <span className="text-[10px] uppercase font-mono font-bold text-indigo-400 bg-indigo-500/10 px-2 py-0.5 rounded border border-indigo-500/15">
-                    Total submissions: {studentSubmissions.length}
+                    {studentSubmissions.length} submissions
                   </span>
                 </div>
+
+                {/* Student Performance Charts */}
+                {!loadingSubmissions && studentSubmissions.length > 0 && (() => {
+                  // Compute stats for this student
+                  let sumScore = 0, sumMax = 0, correctC = 0, partialC = 0, incorrectC = 0;
+                  const topicMap = {};
+                  studentSubmissions.forEach(sub => {
+                    const pct = (sub.scored_marks / sub.total_marks) * 100;
+                    sumScore += parseFloat(sub.scored_marks);
+                    sumMax += sub.total_marks;
+                    if (pct >= 80) correctC++;
+                    else if (pct >= 40) partialC++;
+                    else incorrectC++;
+                    const t = sub.questions?.sub_topic || 'General';
+                    if (!topicMap[t]) topicMap[t] = { score: 0, max: 0, count: 0 };
+                    topicMap[t].score += parseFloat(sub.scored_marks);
+                    topicMap[t].max += sub.total_marks;
+                    topicMap[t].count++;
+                  });
+                  const avgAcc = sumMax > 0 ? Math.round((sumScore / sumMax) * 100) : 0;
+                  const topicStats = Object.keys(topicMap).map(topic => ({
+                    topic,
+                    accuracy: topicMap[topic].max > 0 ? Math.round((topicMap[topic].score / topicMap[topic].max) * 100) : null,
+                    count: topicMap[topic].count
+                  }));
+
+                  return (
+                    <div className="space-y-5 bg-gray-950 border border-gray-805 rounded-2xl p-5">
+                      <div className="flex items-center gap-2 border-b border-gray-800 pb-3">
+                        <TrendingUp className="w-3.5 h-3.5 text-indigo-400" />
+                        <span className="text-[10px] uppercase font-bold text-gray-400 tracking-wider">Student Performance Analytics</span>
+                      </div>
+                      {/* Accuracy Ring + Trend row */}
+                      <div className="grid grid-cols-2 gap-4 items-center">
+                        <div className="flex flex-col items-center">
+                          <AccuracyRing
+                            accuracy={avgAcc}
+                            size={110}
+                            strokeWidth={12}
+                            sublabel="Overall"
+                            label={`${correctC}✓ ${partialC}~ ${incorrectC}✗`}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <span className="text-[9px] uppercase font-bold text-gray-500 tracking-wider block">Score Trend</span>
+                          <ScoreTrend submissions={studentSubmissions} height={60} />
+                        </div>
+                      </div>
+                      {/* Topic bar chart */}
+                      <div className="space-y-2 border-t border-gray-800 pt-4">
+                        <span className="text-[9px] uppercase font-bold text-gray-500 tracking-wider block">Topic Performance</span>
+                        <TopicBarChart topics={topicStats} maxBars={6} />
+                      </div>
+                    </div>
+                  );
+                })()}
 
                 {/* Submissions List */}
                 {loadingSubmissions ? (
@@ -252,26 +309,26 @@ export default function TeacherDashboard({ user }) {
                           
                           {/* Top Row info */}
                           <div className="flex justify-between items-start text-xs border-b border-gray-805 pb-3">
-                            <div>
+                            <div className="min-w-0 flex-1">
                               <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wide">{sub.questions?.sub_topic || "Quadratic Equations"}</span>
-                              <h4 className="text-sm font-bold text-white mt-1 leading-relaxed">{sub.questions?.question_text}</h4>
+                              <h4 className="text-sm font-bold text-white mt-1 leading-relaxed line-clamp-2">{sub.questions?.question_text}</h4>
                             </div>
-                            <div className="text-right shrink-0">
+                            <div className="text-right shrink-0 ml-2">
                               <span className={`inline-block font-mono font-black text-md px-2 py-0.5 rounded-lg ${
                                 percentage >= 80 ? 'text-emerald-400 bg-emerald-500/10' :
                                 percentage >= 40 ? 'text-amber-400 bg-amber-500/10' :
                                 'text-rose-400 bg-rose-500/10'
                               }`}>
-                                {sub.scored_marks} / {sub.total_marks} Marks
+                                {sub.scored_marks} / {sub.total_marks}
                               </span>
-                              <span className="block text-[9px] text-gray-500 mt-1">Graded via {sub.input_type}</span>
+                              <span className="block text-[9px] text-gray-500 mt-1">Via {sub.input_type}</span>
                             </div>
                           </div>
 
                           {/* Student Answer */}
                           <div className="bg-gray-950 p-3 rounded-xl border border-gray-805 space-y-1">
                             <span className="text-[9px] uppercase font-bold text-gray-500 tracking-wider">Student Submission Text:</span>
-                            <p className="text-xs text-gray-300 font-mono leading-relaxed whitespace-pre-line">{sub.student_answer}</p>
+                            <p className="text-xs text-gray-300 font-mono leading-relaxed whitespace-pre-line max-h-16 overflow-y-auto">{sub.student_answer}</p>
                           </div>
 
                           {/* Step evaluations list */}
@@ -308,7 +365,7 @@ export default function TeacherDashboard({ user }) {
               </div>
             ) : (
               <div className="bg-gray-900 border border-gray-850 p-12 rounded-2xl text-center text-gray-500 italic text-xs">
-                Select a student from the directory roster to view their mathematical diagnostic reports and visual OCR worksheets.
+                Select a student from the directory roster to view their mathematical diagnostic reports and analytics.
               </div>
             )}
           </div>
